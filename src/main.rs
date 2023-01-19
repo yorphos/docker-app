@@ -29,29 +29,27 @@ async fn async_main() {
     while iterations > 0 {
         let event = eventloop.poll().await.unwrap();
         match event {
-            Event::Incoming(packet) => {
-                match packet {
-                    Packet::Publish(publish) => {
-                        let client_clone = client.clone();
-                        task::spawn(async move {
-                            match client_clone
-                                .publish(
-                                    topic,
-                                    QoS::AtMostOnce,
-                                    false,
-                                    deserialize_payload(&publish.payload),
-                                )
-                                .await
-                            {
-                                Ok(_) => {}
-                                Err(_) => panic!(),
-                            };
-                        });
-                    }
-                    _ => {}
+            Event::Incoming(packet) => match packet {
+                Packet::Publish(publish) => {
+                    let client_clone = client.clone();
+                    task::spawn(async move {
+                        match client_clone
+                            .publish(
+                                topic,
+                                QoS::AtMostOnce,
+                                false,
+                                deserialize_payload(&publish.payload),
+                            )
+                            .await
+                        {
+                            Ok(_) => {}
+                            Err(_) => panic!(),
+                        };
+                    });
+                    iterations -= 1;
                 }
-                iterations -= 1;
-            }
+                _ => {}
+            },
             _ => {}
         }
     }
