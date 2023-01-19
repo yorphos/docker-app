@@ -2,14 +2,10 @@ version: "3"
 services:
   docker_app:
     build: .
-      args:
-
     ports:
       - "8080:8080"
     environment:
-      - ITERATION_COUNT=10000
       - MQTT_BROKER_ID=test
       - MQTT_BROKER_HOST=test.mosquitto.org
       - MQTT_BROKER_PORT=1883
-      - MQTT_TOPIC=test/demo
       - RUST_LOG=debug

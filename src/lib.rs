@@ -1,5 +1,9 @@
+use std::time::Duration;
+
 use md5::{Digest, Md5};
+use rumqttc::{AsyncClient, Event, MqttOptions, Packet, QoS};
 use serde_derive::{Deserialize, Serialize};
+use tokio::task;
 
 pub struct Broker {
     pub id: String,
@@ -8,13 +12,13 @@ pub struct Broker {
 }
 
 #[derive(Deserialize)]
-pub struct Request<'a> {
+struct Request<'a> {
     data: &'a [u8],
     leading_zeros: u8,
 }
 
 #[derive(Serialize)]
-pub struct Response<'a> {
+struct Response<'a> {
     data: &'a [u8],
     leading_zeros: u8,
     nonce: u16,
@@ -36,7 +40,7 @@ fn digest_leading_zeroes(digest_bytes: &[u8]) -> u8 {
     leading_zeros as u8
 }
 
-pub fn handle_request<'a>(request: &'a Request) -> Response<'a> {
+fn handle_request<'a>(request: &'a Request) -> Response<'a> {
     let mut hasher = Md5::new();
     let mut nonce: u16 = 0;
 
@@ -62,6 +66,42 @@ pub fn handle_request<'a>(request: &'a Request) -> Response<'a> {
     }
 }
 
-pub fn deserialize_payload<'a>(payload: &[u8]) -> Vec<u8> {
+fn deserialize_payload(payload: &[u8]) -> Vec<u8> {
     serde_json::to_vec(&handle_request(&serde_json::from_slice(&payload).unwrap())).unwrap()
+}
+
+pub async fn start_serving(broker: &Broker) -> () {
+    let mut mqtt_options = MqttOptions::new(&broker.id, &broker.host, broker.port);
+    mqtt_options.set_keep_alive(Duration::from_secs(5));
+
+    let (client, mut eventloop) = AsyncClient::new(mqtt_options, 10);
+
+    let qos = QoS::AtMostOnce;
+    client.subscribe("hash/request", qos).await.unwrap();
+
+    let mut iterations = 512;
+    while iterations > 0 {
+        let event = eventloop.poll().await.unwrap();
+        match event {
+            Event::Incoming(packet) => match packet {
+                Packet::Publish(publish) => {
+                    let client_clone = client.clone();
+                    task::spawn(async move {
+                        client_clone
+                            .publish(
+                                "hash/response",
+                                QoS::AtMostOnce,
+                                false,
+                                deserialize_payload(&publish.payload),
+                            )
+                            .await
+                            .unwrap()
+                    });
+                    iterations -= 1;
+                }
+                _ => {}
+            },
+            _ => {}
+        }
+    }
 }
