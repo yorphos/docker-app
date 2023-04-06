@@ -1,0 +1,33 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: docker-app
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: docker-app
+  template:
+    metadata:
+      labels:
+        app: docker-app
+    spec:
+      terminationGracePeriodSeconds: 30
+      containers:
+        - name: docker-app
+          image: <your-docker-image>
+          ports:
+            - containerPort: 8080
+          env:
+            - name: MQTT_BROKER_ID
+              value: "test"
+            - name: MQTT_BROKER_HOST
+              value: "test.mosquitto.org"
+            - name: MQTT_BROKER_PORT
+              value: "1883"
+            - name: RUST_LOG
+              value: "debug"
+          lifecycle:
+            preStop:
+              exec:
+                command: ["pkill", "-TERM", "-x", "docker-app"]

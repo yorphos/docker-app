@@ -1,0 +1,22 @@
+apiVersion: autoscaling/v2beta2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: docker-app
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: docker-app
+  minReplicas: 1
+  maxReplicas: 10
+  metrics:
+    - type: External
+      external:
+        metric:
+          name: requests_in_queue
+          selector:
+            matchLabels:
+              app: docker-app
+        target:
+          type: AverageValue
+          averageValue: <SCALE_FACTOR>
